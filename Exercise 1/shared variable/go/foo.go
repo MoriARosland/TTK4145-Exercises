@@ -24,20 +24,26 @@ type request struct {
 var (
 	serverChan = make(chan request) // Channel for communicating with the server
 	workerDone = make(chan bool)
+	stopServer = make(chan bool)
 )
 
 // var i = 0
 
 func server() {
-	var i int // The server's private variable
-	for req := range serverChan {
-		switch req.op {
-		case increment:
-			i++
-		case decrement:
-			i--
-		case read:
-			req.value <- i // Send the current value of i back to the requester
+	var i int
+	for {
+		select {
+		case req := <-serverChan: // Listen for requests on serverChan
+			switch req.op {
+			case increment:
+				i++
+			case decrement:
+				i--
+			case read:
+				req.value <- i
+			}
+		case <-stopServer: // Listen for a stop signal
+			return // Exit the server goroutine
 		}
 	}
 }
@@ -60,7 +66,7 @@ func decrementing() {
 
 func main() {
 	// What does GOMAXPROCS do? What happens if you set it to 1?
-	runtime.GOMAXPROCS(2) // GOMAXPROC sets the maximum number of threads than can run simultaniously.
+	runtime.GOMAXPROCS(3) // GOMAXPROC sets the maximum number of threads than can run simultaniously.
 
 	// TODO: Spawn both functions as goroutines
 
@@ -78,5 +84,6 @@ func main() {
 	i := <-responseChan // Receive the response
 
 	fmt.Println("The magic number is:", i)
-	close(serverChan) // Close the server channel
+	// close(serverChan) // Close the server channel
+	stopServer <- true
 }
