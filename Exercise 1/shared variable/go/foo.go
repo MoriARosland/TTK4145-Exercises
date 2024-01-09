@@ -3,30 +3,59 @@
 package main
 
 import (
-	. "fmt"
+	"fmt"
 	"runtime"
-	"time"
 )
 
-var i = 0
+type operation int
+
+const (
+	increment operation = iota
+	decrement
+	read
+)
+
+// request represents a request to the server.
+type request struct {
+	op    operation // operation type
+	value chan int  // channel to send value for read operation
+}
+
+var (
+	serverChan = make(chan request) // Channel for communicating with the server
+	workerDone = make(chan bool)
+)
+
+// var i = 0
+
+func server() {
+	var i int // The server's private variable
+	for req := range serverChan {
+		switch req.op {
+		case increment:
+			i++
+		case decrement:
+			i--
+		case read:
+			req.value <- i // Send the current value of i back to the requester
+		}
+	}
+}
 
 func incrementing() {
-	//TODO: increment i 1000000 times
-	j := 0
-	for j < 1000000 {
-		j++
-		i++
+	for j := 0; j < 1000000; j++ {
+		serverChan <- request{op: increment}
 	}
 
+	workerDone <- true
 }
 
 func decrementing() {
-	//TODO: decrement i 1000000 times
-	j := 0
-	for j < 1000000 {
-		j++
-		i--
+	for j := 0; j < 1000000; j++ {
+		serverChan <- request{op: decrement}
 	}
+
+	workerDone <- true
 }
 
 func main() {
@@ -34,11 +63,20 @@ func main() {
 	runtime.GOMAXPROCS(2) // GOMAXPROC sets the maximum number of threads than can run simultaniously.
 
 	// TODO: Spawn both functions as goroutines
+
+	go server()
+
 	go incrementing()
 	go decrementing()
 
-	// We have no direct way to wait for the completion of a goroutine (without additional synchronization of some sort)
-	// We will do it properly with channels soon. For now: Sleep.
-	time.Sleep(500 * time.Millisecond)
-	Println("The magic number is:", i)
+	<-workerDone
+	<-workerDone
+
+	// Request the final value of i from the server
+	responseChan := make(chan int)
+	serverChan <- request{op: read, value: responseChan}
+	i := <-responseChan // Receive the response
+
+	fmt.Println("The magic number is:", i)
+	close(serverChan) // Close the server channel
 }
