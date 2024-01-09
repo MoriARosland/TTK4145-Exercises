@@ -10,7 +10,7 @@ What is the difference between a *race condition* and a *data race*?
 > *Your answer here* 
  
 *Very* roughly - what does a *scheduler* do, and how does it do it?
-> *Your answer here* 
+A scheduler descides what thread will run and for how long. A scheduler can be implemented preemptive (time based)  or cooperativly (manualy coded or compiler coded).
 
 
 ### Engineering
